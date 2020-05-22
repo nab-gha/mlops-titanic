@@ -10,3 +10,4 @@ metastore_db
 *.log
 output*
 creditcard*
+**/.ipynb_checkpoints
