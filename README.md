@@ -4,13 +4,57 @@ The `titanic-survival-prediction.py` sample runs a Spark ML pipeline to train a 
 copy of [Jeffwan's code](https://github.com/Jeffwan/aws-emr-titanic-ml-example) for gitops workshop
 Also pipeline sample from [kubeflow/pipeline](https://github.com/kubeflow/pipelines/tree/master/samples/contrib/aws-samples/titanic-survival-prediction)
 
-### Build Spark Jars
+# Build and Configure Titanic Sample
+
 
 ```shell
-sbt clean package
+# Set default region
+export AWS_REGION=$(curl -s 169.254.169.254/latest/dynamic/instance-identity/document | jq -r '.region') # For ec2 client or cloud9
+export AWS_DEFAULT_REGION=$AWS_REGION
 
-# copy this jar to your s3 bucket. main class is `com.amazonaws.emr.titanic.Titanic`
-ls target/scala-2.11/titanic-survivors-prediction_2.11-1.0.jar
+aws iam create-user --user-name mlops-user
+aws iam create-access-key --user-name mlops-user > mlops-user.json
+export THE_ACCESS_KEY_ID=$(jq '."AccessKey"["AccessKeyId"]' mlops-user.json)
+echo $THE_ACCESS_KEY_ID
+export THE_SECRET_ACCESS_KEY=$(jq '."AccessKey"["SecretAccessKey"]' mlops-user.json)
+
+export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
+
+aws iam create-policy --policy-name mlops-s3-access \
+    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/ml-workshop/master/resources/s3-policy.json  > s3-policy.json
+
+aws iam create-policy --policy-name mlops-emr-access \
+    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/ml-workshop/master/resources/emr-policy.json > emr-policy.json
+
+aws iam create-policy --policy-name mlops-iam-access \
+    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/ml-workshop/master/resources/iam-policy.json > iam-policy.json
+
+aws iam attach-user-policy --user-name mlops-user  --policy-arn $(jq '."Policy"["Arn"]' s3-policy.json)
+aws iam attach-user-policy --user-name mlops-user  --policy-arn $(jq '."Policy"["Arn"]' emr-policy.json)
+
+curl  https://raw.githubusercontent.com/paulcarlton-ww/ml-workshop/master/resources/kubeflow-aws-secret.yaml | \
+    sed s/YOUR_BASE64_SECRET_ACCESS/$(echo -n "$THE_SECRET_ACCESS_KEY" | base64)/ | \
+    sed s/YOUR_BASE64_ACCESS_KEY/$(echo -n "$THE_ACCESS_KEY_ID" | base64)/ | kubectl apply -f -;echo
+
+aws s3api create-bucket --bucket mlops-kubeflow-pipeline-data --region $AWS_DEFAULT_REGION --create-bucket-configuration LocationConstraint=$AWS_DEFAULT_REGION
+```
+
+## Install sbt
+
+```shell
+curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+sdk install java
+sdk install sbt
+```
+
+## Build Spark Jars
+
+```shell
+git clone git@github.com:paulcarlton-ww/mlops-titanic
+cd mlops-titanic/
+sbt clean package
+aws s3api put-object --bucket mlops-kubeflow-pipeline-data --key emr/titanic/titanic-survivors-prediction_2.11-1.0.jar --body target/scala-2.11/titanic-survivors-prediction_2.11-1.0.jar
 ```
 
 > Note: EMR has all spark libariries and this project doesn't reply on third-party library. We don't need to build fat jars.
@@ -21,28 +65,21 @@ Check Kaggle [Titanic: Machine Learning from Disaster](https://www.kaggle.com/c/
 
 A copy of train.csv is included in this repository
 
-## EMR permission
+## Install 
 
-This pipeline use aws-secret to get access to EMR services, please make sure you have a `aws-secret` in the kubeflow namespace and attach `AmazonElasticMapReduceFullAccess` policy.
+See [building a pipeline](https://www.kubeflow.org/docs/guides/pipelines/build-pipeline/) to install the Kubeflow Pipelines SDK.
+The following command will install the tools required
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: aws-secret
-  namespace: kubeflow
-type: Opaque
-data:
-  AWS_ACCESS_KEY_ID: YOUR_BASE64_ACCESS_KEY
-  AWS_SECRET_ACCESS_KEY: YOUR_BASE64_SECRET_ACCESS
+```bash
+wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
+source /home/ec2-user/.bashrc
+conda create --name mlpipeline python=3.7
+pip3 install --user kfp --upgrade
+rm Miniconda3-latest-Linux-x86_64.sh 
 ```
 
-> Note: To get base64 string, try `echo -n $AWS_ACCESS_KEY_ID | base64`
-
-
 ## Compiling the pipeline template
-
-Follow the guide to [building a pipeline](https://www.kubeflow.org/docs/guides/pipelines/build-pipeline/) to install the Kubeflow Pipelines SDK, then run the following command to compile the sample Python into a workflow specification. The specification takes the form of a YAML file compressed into a `.tar.gz` file.
 
 ```bash
 dsl-compile --py titanic-survival-prediction.py --output titanic-survival-prediction.tar.gz
