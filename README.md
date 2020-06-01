@@ -4,8 +4,10 @@ The `titanic-survival-prediction.py` sample runs a Spark ML pipeline to train a 
 copy of [Jeffwan's code](https://github.com/Jeffwan/aws-emr-titanic-ml-example) for gitops workshop
 Also pipeline sample from [kubeflow/pipeline](https://github.com/kubeflow/pipelines/tree/master/samples/contrib/aws-samples/titanic-survival-prediction)
 
-# Build and Configure Titanic Sample
+This repository includes a tar file ready to be deployed to Kubeflow. To build your own tar file fork this repository and clone your fork.
+The following instructions are designed to executed in cloud9 or other ec2 instance. 
 
+# Build and Configure Titanic Sample
 
 ```shell
 # Set default region
@@ -21,18 +23,18 @@ export THE_SECRET_ACCESS_KEY=$(jq '."AccessKey"["SecretAccessKey"]' mlops-user.j
 export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
 
 aws iam create-policy --policy-name mlops-s3-access \
-    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/ml-workshop/master/resources/s3-policy.json  > s3-policy.json
+    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/mlops-titanic/master/resources/s3-policy.json  > s3-policy.json
 
 aws iam create-policy --policy-name mlops-emr-access \
-    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/ml-workshop/master/resources/emr-policy.json > emr-policy.json
+    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/mlops-titanic/master/resources/emr-policy.json > emr-policy.json
 
 aws iam create-policy --policy-name mlops-iam-access \
-    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/ml-workshop/master/resources/iam-policy.json > iam-policy.json
+    --policy-document https://raw.githubusercontent.com/paulcarlton-ww/mlops-titanic/master/resources/iam-policy.json > iam-policy.json
 
 aws iam attach-user-policy --user-name mlops-user  --policy-arn $(jq '."Policy"["Arn"]' s3-policy.json)
 aws iam attach-user-policy --user-name mlops-user  --policy-arn $(jq '."Policy"["Arn"]' emr-policy.json)
 
-curl  https://raw.githubusercontent.com/paulcarlton-ww/ml-workshop/master/resources/kubeflow-aws-secret.yaml | \
+curl  https://raw.githubusercontent.com/paulcarlton-ww/mlops-titanic/master/resources/kubeflow-aws-secret.yaml | \
     sed s/YOUR_BASE64_SECRET_ACCESS/$(echo -n "$THE_SECRET_ACCESS_KEY" | base64)/ | \
     sed s/YOUR_BASE64_ACCESS_KEY/$(echo -n "$THE_ACCESS_KEY_ID" | base64)/ | kubectl apply -f -;echo
 
