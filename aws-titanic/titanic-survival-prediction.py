@@ -14,7 +14,7 @@ emr_delete_cluster_op     = components.load_component_from_file('emr/delete_clus
   name='Titanic Suvival Prediction Pipeline',
   description='Predict survival on the Titanic'
 )
-def titanic_suvival_prediction(region='eu-west-2',
+def titanic_suvival_prediction(region='aws-region',
     log_s3_uri="s3://mlops-kubeflow-pipeline-data/emr/titanic/logs",
     cluster_name="emr-cluster",
     job_name='spark-ml-trainner',

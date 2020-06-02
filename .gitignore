@@ -11,4 +11,5 @@ metastore_db
 output*
 creditcard*
 **/.ipynb_checkpoints
+**/build
 **/__pycache__
